@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    container_name: propilkki-api
+    network_mode: host
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+    restart: unless-stopped

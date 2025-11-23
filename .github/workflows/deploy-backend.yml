@@ -1,0 +1,64 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Build Docker image
+        run: |
+          cd backend
+          docker build -t propilkki-api:${{ github.sha }} .
+          docker save propilkki-api:${{ github.sha }} | gzip > propilkki-api.tar.gz
+
+      - name: Transfer image to server
+        run: |
+          scp -i ~/.ssh/id_ed25519 backend/propilkki-api.tar.gz \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/tmp/
+
+      - name: Deploy on server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            # Load new image
+            docker load < /tmp/propilkki-api.tar.gz
+            rm /tmp/propilkki-api.tar.gz
+            
+            # Stop old container
+            docker stop propilkki-api || true
+            docker rm propilkki-api || true
+            
+            # Run new container with host network (access to localhost:5432)
+            docker run -d \
+              --name propilkki-api \
+              --restart unless-stopped \
+              --network host \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
+              propilkki-api:${{ github.sha }}
+            
+            # Cleanup old images
+            docker image prune -f
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 5
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} \
+            "curl -f http://localhost:8000/health || exit 1"
