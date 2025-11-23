@@ -23,6 +23,21 @@ class LeaderboardEntry(BaseModel):
     total_weight_grams: int
     competitions_count: int
     biggest_catch: Optional[int]
+    biggest_catch_species: Optional[str]
+
+class SpeciesRecord(BaseModel):
+    species: str
+    player_name: str
+    weight_grams: int
+    lake: str
+    timestamp: datetime
+
+class TopCatch(BaseModel):
+    player_name: str
+    lake: str
+    species: str
+    weight_grams: int
+    timestamp: datetime
 
 class SpeciesStats(BaseModel):
     species: str

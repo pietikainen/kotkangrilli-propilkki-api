@@ -4,7 +4,7 @@ Statistics and leaderboard endpoints
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from app.database import get_db
-from app.models import LeaderboardEntry, SpeciesStats, LakeStats, CompetitionCatch
+from app.models import LeaderboardEntry, SpeciesStats, LakeStats, CompetitionCatch, SpeciesRecord, TopCatch
 
 router = APIRouter(prefix="/api/stats", tags=["statistics"])
 
@@ -14,7 +14,7 @@ def get_leaderboard(
     lake: Optional[str] = None
 ):
     """
-    Get top players leaderboard
+    Get top players leaderboard with biggest catch species
     """
     with get_db() as conn:
         cur = conn.cursor()
@@ -24,15 +24,25 @@ def get_leaderboard(
             where_clause += f" AND lake = %s"
         
         query = f"""
+            WITH player_biggest AS (
+                SELECT DISTINCT ON (player_name)
+                    player_name,
+                    species as biggest_catch_species
+                FROM competition_catches
+                {where_clause}
+                ORDER BY player_name, player_reported_biggest DESC
+            )
             SELECT 
-                player_name,
-                SUM(fish_count) as total_fish,
-                SUM(total_weight_grams) as total_weight_grams,
-                COUNT(DISTINCT timestamp) as competitions_count,
-                MAX(player_reported_biggest) as biggest_catch
-            FROM competition_catches
+                c.player_name,
+                SUM(c.fish_count) as total_fish,
+                SUM(c.total_weight_grams) as total_weight_grams,
+                COUNT(DISTINCT c.timestamp) as competitions_count,
+                MAX(c.player_reported_biggest) as biggest_catch,
+                pb.biggest_catch_species
+            FROM competition_catches c
+            LEFT JOIN player_biggest pb ON c.player_name = pb.player_name
             {where_clause}
-            GROUP BY player_name
+            GROUP BY c.player_name, pb.biggest_catch_species
             ORDER BY total_weight_grams DESC
             LIMIT %s
         """
@@ -126,5 +136,59 @@ def get_recent_catches(
         params.append(limit)
         cur.execute(query, params)
         
+        results = cur.fetchall()
+        return results
+
+@router.get("/species/{species}/record", response_model=SpeciesRecord)
+def get_species_record(species: str):
+    """
+    Get the biggest catch record for a specific species
+    """
+    with get_db() as conn:
+        cur = conn.cursor()
+        
+        query = """
+            SELECT 
+                species,
+                player_name,
+                player_reported_biggest as weight_grams,
+                lake,
+                timestamp
+            FROM competition_catches
+            WHERE species = %s AND disqualified = false
+            ORDER BY player_reported_biggest DESC
+            LIMIT 1
+        """
+        
+        cur.execute(query, [species])
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"No catches found for species: {species}")
+        
+        return result
+
+@router.get("/top-catches", response_model=List[TopCatch])
+def get_top_catches(limit: int = Query(default=10, ge=1, le=100)):
+    """
+    Get top catches by weight across all species
+    """
+    with get_db() as conn:
+        cur = conn.cursor()
+        
+        query = """
+            SELECT 
+                player_name,
+                lake,
+                species,
+                player_reported_biggest as weight_grams,
+                timestamp
+            FROM competition_catches
+            WHERE disqualified = false AND player_reported_biggest IS NOT NULL
+            ORDER BY player_reported_biggest DESC
+            LIMIT %s
+        """
+        
+        cur.execute(query, [limit])
         results = cur.fetchall()
         return results
