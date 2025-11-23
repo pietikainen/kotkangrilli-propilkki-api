@@ -39,15 +39,15 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             # Load new image
-            sudo docker load < /tmp/propilkki-api.tar.gz
+            docker load < /tmp/propilkki-api.tar.gz
             rm /tmp/propilkki-api.tar.gz
             
             # Stop old container
-            sudo docker stop propilkki-api || true
-            sudo docker rm propilkki-api || true
+            docker stop propilkki-api || true
+            docker rm propilkki-api || true
             
             # Run new container with port mapping
-            sudo docker run -d \
+            docker run -d \
               --name propilkki-api \
               --restart unless-stopped \
               -p 8000:8000 \
@@ -57,7 +57,7 @@ jobs:
               propilkki-api:${{ github.sha }}
             
             # Cleanup old images
-            sudo docker image prune -f
+            docker image prune -f
           EOF
 
       - name: Health check
