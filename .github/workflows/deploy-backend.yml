@@ -3,9 +3,6 @@ name: Deploy Backend
 on:
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   deploy:
@@ -24,13 +21,12 @@ jobs:
 
       - name: Build Docker image
         run: |
-          cd backend
           docker build -t propilkki-api:${{ github.sha }} .
           docker save propilkki-api:${{ github.sha }} | gzip > propilkki-api.tar.gz
 
       - name: Transfer image to server
         run: |
-          scp -i ~/.ssh/id_ed25519 backend/propilkki-api.tar.gz \
+          scp -i ~/.ssh/id_ed25519 propilkki-api.tar.gz \
             ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }}:/tmp/
 
       - name: Deploy on server
