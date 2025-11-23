@@ -57,3 +57,5 @@ Connects to existing PostgreSQL database on localhost:
 DATABASE_URL=postgresql://user:pass@host:5432/pp2stats
 CORS_ORIGINS=http://localhost:3000,http://your-server-ip
 ```
+
+---
