@@ -4,7 +4,7 @@ Statistics and leaderboard endpoints
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from app.database import get_db
-from app.models import LeaderboardEntry, SpeciesStats, LakeStats, CompetitionCatch, SpeciesRecord, TopCatch
+from app.models import LeaderboardEntry, SpeciesStats, LakeStats, CompetitionCatch, SpeciesRecord, TopCatch, SpeciesRecordList
 
 router = APIRouter(prefix="/api/stats", tags=["statistics"])
 
@@ -190,5 +190,29 @@ def get_top_catches(limit: int = Query(default=10, ge=1, le=100)):
         """
         
         cur.execute(query, [limit])
+        results = cur.fetchall()
+        return results
+
+@router.get("/species-records", response_model=List[SpeciesRecordList])
+def get_species_records():
+    """
+    Get the biggest catch for each unique species (kalalaji, paino, kalastaja, järvi, päivämäärä)
+    """
+    with get_db() as conn:
+        cur = conn.cursor()
+        
+        query = """
+            SELECT DISTINCT ON (species)
+                species,
+                player_reported_biggest as weight_grams,
+                player_name,
+                lake,
+                timestamp
+            FROM competition_catches
+            WHERE disqualified = false AND player_reported_biggest IS NOT NULL
+            ORDER BY species, player_reported_biggest DESC
+        """
+        
+        cur.execute(query)
         results = cur.fetchall()
         return results

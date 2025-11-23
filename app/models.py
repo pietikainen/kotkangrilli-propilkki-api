@@ -32,6 +32,13 @@ class SpeciesRecord(BaseModel):
     lake: str
     timestamp: datetime
 
+class SpeciesRecordList(BaseModel):
+    species: str
+    weight_grams: int
+    player_name: str
+    lake: str
+    timestamp: datetime
+
 class TopCatch(BaseModel):
     player_name: str
     lake: str
