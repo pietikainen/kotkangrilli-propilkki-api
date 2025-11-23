@@ -46,12 +46,11 @@ jobs:
             docker stop propilkki-api || true
             docker rm propilkki-api || true
             
-            # Run new container with port mapping
+            # Run new container with host networking for PostgreSQL access
             docker run -d \
               --name propilkki-api \
               --restart unless-stopped \
-              -p 8000:8000 \
-              --add-host host.docker.internal:host-gateway \
+              --network host \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
               propilkki-api:${{ github.sha }}
