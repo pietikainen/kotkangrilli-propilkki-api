@@ -39,28 +39,29 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             # Load new image
-            docker load < /tmp/propilkki-api.tar.gz
+            sudo docker load < /tmp/propilkki-api.tar.gz
             rm /tmp/propilkki-api.tar.gz
             
             # Stop old container
-            docker stop propilkki-api || true
-            docker rm propilkki-api || true
+            sudo docker stop propilkki-api || true
+            sudo docker rm propilkki-api || true
             
-            # Run new container with host network (access to localhost:5432)
-            docker run -d \
+            # Run new container with port mapping
+            sudo docker run -d \
               --name propilkki-api \
               --restart unless-stopped \
-              --network host \
+              -p 8000:8000 \
+              --add-host host.docker.internal:host-gateway \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
               propilkki-api:${{ github.sha }}
             
             # Cleanup old images
-            docker image prune -f
+            sudo docker image prune -f
           EOF
 
       - name: Health check
         run: |
-          sleep 5
+          sleep 10
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SERVER_HOST }} \
             "curl -f http://localhost:8000/health || exit 1"
