@@ -12,6 +12,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug secrets
+        run: |
+          echo "SSH_USER: ${{ secrets.SSH_USER }}"
+          echo "SERVER_HOST: ${{ secrets.SERVER_HOST }}"
+          echo "DATABASE_URL length: ${{ secrets.DATABASE_URL != '' }}"
+          
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
