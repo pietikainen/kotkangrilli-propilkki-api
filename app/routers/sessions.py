@@ -150,14 +150,15 @@ def get_daily_activity(days: int = Query(default=30, ge=1, le=365)):
     with get_db() as conn:
         cur = conn.cursor()
         
+        # Fixed: Use proper SQL interval syntax with psycopg2 parameter
         query = """
             SELECT 
-                DATE(joined_at) as date,
+                DATE(joined_at)::text as date,
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT player_name) as unique_players,
                 ROUND(COALESCE(SUM(session_duration_seconds), 0) / 3600.0, 2) as total_playtime_hours
             FROM player_sessions
-            WHERE joined_at >= NOW() - INTERVAL '%s days'
+            WHERE joined_at >= NOW() - INTERVAL '1 day' * %s
             GROUP BY DATE(joined_at)
             ORDER BY date DESC
         """
