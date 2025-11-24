@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from app.routers import stats
+from app.routers import stats, sessions
 
 app = FastAPI(
     title="Propilkki Tournament API",
@@ -25,6 +25,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(stats.router)
+app.include_router(sessions.router)
 
 @app.get("/")
 def root():

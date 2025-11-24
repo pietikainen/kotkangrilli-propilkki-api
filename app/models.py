@@ -57,3 +57,47 @@ class LakeStats(BaseModel):
     total_fish: int
     total_competitions: int
     unique_species: int
+
+# Player session models (no IP addresses exposed)
+class PlayerSession(BaseModel):
+    id: int
+    player_name: str
+    joined_at: datetime
+    left_at: Optional[datetime]
+    session_duration_seconds: Optional[int]
+    player_version: Optional[str]
+
+class PlayerSessionStats(BaseModel):
+    player_name: str
+    total_sessions: int
+    total_playtime_seconds: int
+    total_playtime_hours: float
+    avg_session_duration_seconds: Optional[int]
+    first_seen: datetime
+    last_seen: datetime
+
+class TopPlayer(BaseModel):
+    player_name: str
+    total_sessions: int
+    total_playtime_hours: float
+    avg_session_hours: float
+
+class DailyActivity(BaseModel):
+    date: str  # YYYY-MM-DD format
+    total_sessions: int
+    unique_players: int
+    total_playtime_hours: float
+
+class HourlyActivity(BaseModel):
+    hour: int  # 0-23
+    total_sessions: int
+    avg_session_duration_minutes: float
+
+class PlayerEfficiency(BaseModel):
+    player_name: str
+    total_playtime_hours: float
+    total_fish: int
+    total_weight_grams: int
+    fish_per_hour: float
+    grams_per_hour: float
+    competitions_count: int
