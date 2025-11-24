@@ -29,6 +29,7 @@ def get_recent_sessions(limit: int = Query(default=20, ge=1, le=100)):
                 id, player_name, joined_at, left_at, 
                 session_duration_seconds, player_version
             FROM player_sessions
+            WHERE joined_at >= '2025-11-23 00:00:00+00:00'
             ORDER BY joined_at DESC
             LIMIT %s
         """
@@ -51,6 +52,7 @@ def get_active_sessions():
                 session_duration_seconds, player_version
             FROM player_sessions
             WHERE left_at IS NULL
+                AND joined_at >= '2025-11-23 00:00:00+00:00'
             ORDER BY joined_at DESC
         """
         
@@ -75,6 +77,7 @@ def get_player_sessions(
                 session_duration_seconds, player_version
             FROM player_sessions
             WHERE player_name = %s
+                AND joined_at >= '2025-11-23 00:00:00+00:00'
             ORDER BY joined_at DESC
             LIMIT %s
         """
@@ -106,6 +109,7 @@ def get_player_session_stats(player_name: str):
                 MAX(joined_at) as last_seen
             FROM player_sessions
             WHERE player_name = %s
+                AND joined_at >= '2025-11-23 00:00:00+00:00'
             GROUP BY player_name
         """
         
@@ -133,6 +137,7 @@ def get_top_players(limit: int = Query(default=10, ge=1, le=50)):
                 ROUND(AVG(session_duration_seconds) / 3600.0, 2) as avg_session_hours
             FROM player_sessions
             WHERE session_duration_seconds IS NOT NULL
+                AND joined_at >= '2025-11-23 00:00:00+00:00'
             GROUP BY player_name
             ORDER BY total_playtime_hours DESC
             LIMIT %s
@@ -182,6 +187,7 @@ def get_hourly_activity():
                 ROUND(AVG(session_duration_seconds) / 60.0, 1) as avg_session_duration_minutes
             FROM player_sessions
             WHERE session_duration_seconds IS NOT NULL
+                AND joined_at >= '2025-11-23 00:00:00+00:00'
             GROUP BY EXTRACT(HOUR FROM joined_at)
             ORDER BY hour
         """
@@ -206,6 +212,7 @@ def get_player_efficiency(player_name: str):
                     COALESCE(SUM(session_duration_seconds), 0) / 3600.0 as total_playtime_hours
                 FROM player_sessions
                 WHERE player_name = %s
+                    AND joined_at >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
             ),
             catch_stats AS (
@@ -215,7 +222,9 @@ def get_player_efficiency(player_name: str):
                     SUM(total_weight_grams) as total_weight_grams,
                     COUNT(DISTINCT timestamp) as competitions_count
                 FROM competition_catches
-                WHERE player_name = %s AND disqualified = false
+                WHERE player_name = %s 
+                    AND disqualified = false
+                    AND timestamp >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
             )
             SELECT 
@@ -262,6 +271,7 @@ def get_all_players_efficiency(limit: int = Query(default=20, ge=1, le=100)):
                     player_name,
                     COALESCE(SUM(session_duration_seconds), 0) / 3600.0 as total_playtime_hours
                 FROM player_sessions
+                WHERE joined_at >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
             ),
             catch_stats AS (
@@ -272,29 +282,33 @@ def get_all_players_efficiency(limit: int = Query(default=20, ge=1, le=100)):
                     COUNT(DISTINCT timestamp) as competitions_count
                 FROM competition_catches
                 WHERE disqualified = false
+                    AND timestamp >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
+            ),
+            combined AS (
+                SELECT 
+                    COALESCE(s.player_name, c.player_name) as player_name,
+                    ROUND(COALESCE(s.total_playtime_hours, 0), 2) as total_playtime_hours,
+                    COALESCE(c.total_fish, 0) as total_fish,
+                    COALESCE(c.total_weight_grams, 0) as total_weight_grams,
+                    ROUND(
+                        CASE 
+                            WHEN COALESCE(s.total_playtime_hours, 0) > 0 THEN COALESCE(c.total_fish, 0) / s.total_playtime_hours
+                            ELSE 0 
+                        END, 
+                    2) as fish_per_hour,
+                    ROUND(
+                        CASE 
+                            WHEN COALESCE(s.total_playtime_hours, 0) > 0 THEN COALESCE(c.total_weight_grams, 0) / s.total_playtime_hours
+                            ELSE 0 
+                        END, 
+                    2) as grams_per_hour,
+                    COALESCE(c.competitions_count, 0) as competitions_count
+                FROM session_stats s
+                FULL OUTER JOIN catch_stats c ON s.player_name = c.player_name
             )
-            SELECT 
-                COALESCE(s.player_name, c.player_name) as player_name,
-                ROUND(COALESCE(s.total_playtime_hours, 0), 2) as total_playtime_hours,
-                COALESCE(c.total_fish, 0) as total_fish,
-                COALESCE(c.total_weight_grams, 0) as total_weight_grams,
-                ROUND(
-                    CASE 
-                        WHEN s.total_playtime_hours > 0 THEN c.total_fish / s.total_playtime_hours
-                        ELSE 0 
-                    END, 
-                2) as fish_per_hour,
-                ROUND(
-                    CASE 
-                        WHEN s.total_playtime_hours > 0 THEN c.total_weight_grams / s.total_playtime_hours
-                        ELSE 0 
-                    END, 
-                2) as grams_per_hour,
-                COALESCE(c.competitions_count, 0) as competitions_count
-            FROM session_stats s
-            FULL OUTER JOIN catch_stats c ON s.player_name = c.player_name
-            WHERE s.total_playtime_hours > 0 OR c.total_fish > 0
+            SELECT * FROM combined
+            WHERE total_playtime_hours > 0 OR total_fish > 0
             ORDER BY grams_per_hour DESC
             LIMIT %s
         """
