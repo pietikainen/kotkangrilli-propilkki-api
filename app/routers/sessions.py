@@ -4,7 +4,9 @@ IP addresses are NOT exposed via API for privacy
 """
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
+import psycopg2
 from app.database import get_db
+import psycopg2
 from app.models import (
     PlayerSession, 
     PlayerSessionStats, 
@@ -29,7 +31,6 @@ def get_recent_sessions(limit: int = Query(default=20, ge=1, le=100)):
                 id, player_name, joined_at, left_at, 
                 session_duration_seconds, player_version
             FROM player_sessions
-            WHERE joined_at >= '2025-11-23 00:00:00+00:00'
             ORDER BY joined_at DESC
             LIMIT %s
         """
@@ -56,9 +57,13 @@ def get_active_sessions():
             ORDER BY joined_at DESC
         """
         
-        cur.execute(query)
-        results = cur.fetchall()
-        return results
+        try:
+            cur.execute(query)
+            results = cur.fetchall()
+            return results
+        except psycopg2.errors.UndefinedTable:
+            # Legacy table puuttuu paikallisesta skeemasta -> palauta tyhjä lista
+            return []
 
 @router.get("/player/{player_name}", response_model=List[PlayerSession])
 def get_player_sessions(
@@ -212,20 +217,18 @@ def get_player_efficiency(player_name: str):
                     COALESCE(SUM(session_duration_seconds), 0) / 3600.0 as total_playtime_hours
                 FROM player_sessions
                 WHERE player_name = %s
-                    AND joined_at >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
             ),
             catch_stats AS (
                 SELECT 
-                    player_name,
-                    SUM(fish_count) as total_fish,
-                    SUM(total_weight_grams) as total_weight_grams,
-                    COUNT(DISTINCT timestamp) as competitions_count
-                FROM competition_catches
-                WHERE player_name = %s 
-                    AND disqualified = false
-                    AND timestamp >= '2025-11-23 00:00:00+00:00'
-                GROUP BY player_name
+                    u.base_nickname as player_name,
+                    SUM(fc.count) as total_fish,
+                    SUM(fc.total_weight) as total_weight_grams,
+                    COUNT(DISTINCT fc.competition_id) as competitions_count
+                FROM fish_catches fc
+                JOIN users u ON fc.user_id = u.id
+                WHERE u.base_nickname = %s
+                GROUP BY u.base_nickname
             )
             SELECT 
                 COALESCE(s.player_name, c.player_name) as player_name,
@@ -271,19 +274,17 @@ def get_all_players_efficiency(limit: int = Query(default=20, ge=1, le=100)):
                     player_name,
                     COALESCE(SUM(session_duration_seconds), 0) / 3600.0 as total_playtime_hours
                 FROM player_sessions
-                WHERE joined_at >= '2025-11-23 00:00:00+00:00'
                 GROUP BY player_name
             ),
             catch_stats AS (
                 SELECT 
-                    player_name,
-                    SUM(fish_count) as total_fish,
-                    SUM(total_weight_grams) as total_weight_grams,
-                    COUNT(DISTINCT timestamp) as competitions_count
-                FROM competition_catches
-                WHERE disqualified = false
-                    AND timestamp >= '2025-11-23 00:00:00+00:00'
-                GROUP BY player_name
+                    u.base_nickname as player_name,
+                    SUM(fc.count) as total_fish,
+                    SUM(fc.total_weight) as total_weight_grams,
+                    COUNT(DISTINCT fc.competition_id) as competitions_count
+                FROM fish_catches fc
+                JOIN users u ON fc.user_id = u.id
+                GROUP BY u.base_nickname
             ),
             combined AS (
                 SELECT 
@@ -312,7 +313,10 @@ def get_all_players_efficiency(limit: int = Query(default=20, ge=1, le=100)):
             ORDER BY grams_per_hour DESC
             LIMIT %s
         """
-        
-        cur.execute(query, [limit])
-        results = cur.fetchall()
-        return results
+        try:
+            cur.execute(query, [limit])
+            results = cur.fetchall()
+            return results
+        except psycopg2.errors.UndefinedTable:
+            # Sessions-taulu puuttuu (esim. paikallinen turnaus-skeema) -> tyhjä lista
+            return []

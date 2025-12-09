@@ -25,6 +25,34 @@ class LeaderboardEntry(BaseModel):
     biggest_catch: Optional[int]
     biggest_catch_species: Optional[str]
 
+class TournamentCompetition(BaseModel):
+    id: int
+    lake: str
+    start_time: datetime
+    duration_minutes: int
+    difficulty: str
+    game_mode: str
+    ice_condition: str
+    season: str
+    time_of_day: str
+
+class TournamentParticipant(BaseModel):
+    player_name: str
+    rank: Optional[int]
+    total_weight: Optional[int]
+    disqualified: bool
+    joined_at: datetime
+    left_at: Optional[datetime]
+
+class FishCatch(BaseModel):
+    player_name: str
+    species: str
+    count: int
+    total_weight: int
+    largest_weight: int
+    competition_lake: str
+    competition_time: datetime
+
 class SpeciesRecord(BaseModel):
     species: str
     player_name: str
@@ -101,3 +129,58 @@ class PlayerEfficiency(BaseModel):
     fish_per_hour: float
     grams_per_hour: float
     competitions_count: int
+
+class CompetitionResult(BaseModel):
+    rank: int
+    player_name: str
+    total_weight: int
+    disqualified: bool
+
+class LatestCompetitionResults(BaseModel):
+    competition_id: int
+    lake: str
+    start_time: datetime
+    duration_minutes: int
+    difficulty: str
+    game_mode: str
+    ice_condition: str
+    season: str
+    time_of_day: str
+    results: list[CompetitionResult]
+    elapsed_minutes: int
+    time_remaining_minutes: int
+
+class CurrentParticipant(BaseModel):
+    player_name: str
+    joined_at: datetime
+    is_active: bool  # True if still in game (no left_at)
+
+class CurrentCompetitionInfo(BaseModel):
+    competition_id: int
+    lake: str
+    start_time: datetime
+    duration_minutes: int
+    difficulty: str
+    game_mode: str
+    ice_condition: str
+    season: str
+    time_of_day: str
+    participants: list[CurrentParticipant]
+    elapsed_minutes: int  # How many minutes have passed
+    time_remaining_minutes: int  # How many minutes left
+
+class CompetitionSummary(BaseModel):
+    competition_id: int
+    lake: str
+    start_time: datetime
+    duration_minutes: int
+    difficulty: str
+    game_mode: str
+    ice_condition: str
+    season: str
+    time_of_day: str
+    results: list[CompetitionResult]
+    total_participants: int
+    biggest_fish_species: Optional[str]
+    biggest_fish_weight: Optional[int]
+    biggest_fish_player: Optional[str]
